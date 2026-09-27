@@ -272,7 +272,7 @@ The intended comparison includes:
 |---|---:|---:|---|
 | Initial combinational schematic | 24.449 | 857 | Baseline schematic |
 | Pipelined / timing-optimised schematic | 59.880 | 769 | Timing-driven pipeline |
-| Combinational RTL | **TODO** | **TODO** | Idiomatic RTL port |
+| Combinational RTL | 26.527 | 788 | Idiomatic RTL port |
 | Functionally pipelined RTL | **TODO** | **TODO** | RTL pipeline |
 
 > **TODO:** Add final synthesis / timing comparison figure once the implementations have been synthesised under comparable conditions.
