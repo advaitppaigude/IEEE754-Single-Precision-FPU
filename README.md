@@ -269,7 +269,7 @@ One of the aims of the project is to compare the hardware produced from the sche
 The intended comparison includes:
 
 | Implementation | Maximum frequency (MHz) | Logic resources | Notes |
-|---|---:|---:|---:|---|
+|---|---:|---:|---|
 | Initial combinational schematic | 24.449 | 857 | Baseline schematic |
 | Pipelined / timing-optimised schematic | 59.880 | 769 | Timing-driven pipeline |
 | Combinational RTL | **TODO** | **TODO** | Idiomatic RTL port |
