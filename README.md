@@ -268,12 +268,14 @@ One of the aims of the project is to compare the hardware produced from the sche
 
 The intended comparison includes:
 
-| Implementation | Maximum frequency (MHz) | Logic resources | Notes |
+| Implementation | Characterised Fmax (MHz) | Logic resources (LEs) | Notes |
 |---|---:|---:|---|
 | Initial combinational schematic | 24.449 | 857 | Baseline schematic |
 | Pipelined / timing-optimised schematic | 59.880 | 769 | Timing-driven pipeline |
 | Combinational RTL | 26.527 | 779 | Idiomatic RTL port |
 | Functionally pipelined RTL | **TODO** | **TODO** | RTL pipeline |
+
+Note: For combinational designs, Fmax was measured by placing the datapath between input and output registers solely for timing characterization.
 
 > **TODO:** Add final synthesis / timing comparison figure once the implementations have been synthesised under comparable conditions.
 
