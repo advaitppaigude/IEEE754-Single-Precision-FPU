@@ -14,43 +14,19 @@ The project was developed in two stages. I first implemented the datapath schema
 
 A further aim of the project is to compare the synthesised characteristics of the schematic and RTL implementations, including resource use and maximum operating frequency.
 
-> **Image placeholder — overall datapath / project overview**
->
-> Insert a high-level diagram showing the main floating-point stages.
-
 ---
 
 ## Datapath Architecture
 
 The design was decomposed into a sequence of functional stages:
 
-```text
-Unpack
-  ↓
-Exponent difference
-  ↓
-Significand alignment
-  ↓
-Sign handling / effective subtraction
-  ↓
-Significand arithmetic
-  ↓
-Normalisation
-  ↓
-Rounding
-  ↓
-Post-round renormalisation
-  ↓
-Packing / special-case handling
-```
+<p align="center">
+  <img src="schematics/system_decomposition_diagram.svg" alt="Floating-point datapath decomposition" width="430">
+</p>
 
-Development was incremental. I first focused on obtaining correct basic floating-point addition and subtraction, then added support for rounding and IEEE-754 special cases.
+Development was incremental. I first focused on obtaining correct basic floating-point addition and subtraction, then added rounding and IEEE-754 special-case handling.
 
 The internal datapath separates the stored IEEE-754 fields from the representation used during arithmetic. In particular, the significands are extended to preserve the **guard, round and sticky (GRS) bits** required for correct rounding.
-
-> **Image placeholder — full schematic datapath**
->
-> Insert one overall schematic screenshot here. Detailed block-level schematics can be kept separately under `docs/schematics/`.
 
 ---
 
@@ -58,7 +34,7 @@ The internal datapath separates the stored IEEE-754 fields from the representati
 
 The first implementation was constructed schematically. This made the intermediate operations explicit and forced each part of floating-point addition/subtraction to be considered as hardware rather than as a software arithmetic expression.
 
-The schematic was organised around the same functional stages used in the final RTL design. Some of the more significant blocks included:
+The schematic was organised around the same functional stages shown above. Significant blocks included:
 
 - exponent comparison and alignment;
 - extended right shifting with sticky-bit generation;
@@ -68,23 +44,25 @@ The schematic was organised around the same functional stages used in the final 
 - post-round renormalisation;
 - IEEE-754 special-case classification and output selection.
 
-Rather than placing screenshots of every internal block in this README, the main schematic is shown above and the individual block schematics can be stored separately in the repository.
+The complete top-level schematic is shown below. More detailed block-level schematic images are stored in the [`schematics/`](schematics/) directory.
+
+<p align="center">
+  <img src="schematics/full_datapath_schematic.png" alt="Full floating-point datapath schematic" width="1000">
+</p>
 
 ### Schematic Verification
 
 The schematic design was verified using directed test cases before the SystemVerilog port was developed.
 
-> **Image placeholder — schematic verification setup**
->
-> Insert a screenshot or diagram showing the schematic test/verification setup.
+<p align="center">
+  <img src="schematics/schematic_verification_setup.png" alt="Schematic verification setup" width="900">
+</p>
 
 ### Pipelining Approach
 
 The schematic implementation was also used to explore timing-driven pipelining. The intention was to place pipeline boundaries based on the combinational structure and critical paths rather than simply splitting the design into an arbitrary number of equal stages.
 
-> **Image placeholder — timing / netlist / pipeline stages**
->
-> Insert the relevant netlist or timing screenshots here once the final comparison is complete.
+> **TODO:** Add timing-analysis / netlist images showing the chosen pipeline boundaries and critical-path improvements.
 
 The final synthesis comparison is discussed later in this README.
 
@@ -107,13 +85,17 @@ This allowed the RTL to describe the intended hardware behaviour more directly a
 
 ### Example 1 — Leading-One Detection
 
-The schematic normalisation logic used an explicit priority-encoder structure to identify the position of the first `1` in the significand.
+The schematic normalisation logic used an explicit priority-encoder hierarchy to identify the position of the first `1` in the significand.
 
-> **Image placeholder — schematic priority encoder**
->
-> Insert the corresponding schematic crop here.
+<p align="center">
+  <img src="schematics/priority_encoder_4.png" alt="Four-input priority encoder schematic" width="650">
+</p>
 
-In RTL, the same behaviour can be expressed directly as a priority chain:
+<p align="center">
+  <img src="schematics/priority_encoder_6.png" alt="Six-input priority encoder schematic" width="750">
+</p>
+
+In RTL, the required behaviour can instead be expressed directly as a priority chain:
 
 ```systemverilog
 module find_first_one_position(
@@ -152,17 +134,21 @@ module find_first_one_position(
 endmodule
 ```
 
-The RTL describes the priority behaviour directly rather than reproducing the exact hierarchy of schematic encoder components.
+The RTL describes the required priority behaviour directly rather than reproducing the exact hierarchy of schematic encoder components.
 
 ### Example 2 — Alignment and Sticky-Bit Generation
 
 Floating-point addition requires the smaller significand to be right-shifted until the operand exponents are aligned. Bits discarded during this shift cannot simply be ignored because they contribute to the sticky bit used during rounding.
 
-The schematic implementation used separate shifting and mask-generation logic.
+The schematic implementation used separate shifting and mask-generation logic:
 
-> **Image placeholder — schematic `LSR_EXTENDED` and mask generator**
->
-> Insert the schematic implementation beside or above the RTL version.
+<p align="center">
+  <img src="schematics/lsr_extended.png" alt="Extended logical shift-right schematic" width="850">
+</p>
+
+<p align="center">
+  <img src="schematics/mask_generator.png" alt="Sticky-bit mask generator schematic" width="750">
+</p>
 
 The RTL version combines these operations:
 
@@ -204,6 +190,22 @@ endmodule
 
 The reduction-OR of the masked discarded bits generates the sticky bit while the shifted result retains the bits required for subsequent guard/round handling.
 
+### Example 3 — Normalisation
+
+The schematic normalisation stage combined leading-one detection with logic that limited the left shift so that the exponent could not be decremented below the subnormal boundary.
+
+<p align="center">
+  <img src="schematics/normalisation_extended_subnormal.png" alt="Normalisation and subnormal handling schematic" width="950">
+</p>
+
+The shift amount was bounded separately using the current exponent:
+
+<p align="center">
+  <img src="schematics/actual_shift_calculator.png" alt="Actual normalisation shift calculator schematic" width="700">
+</p>
+
+In the RTL port, these behaviours are represented directly using a leading-one position, a calculated maximum legal shift, and combinational selection logic rather than reproducing the original schematic hierarchy exactly.
+
 ### Other RTL Transformations
 
 Other parts of the port followed the same approach:
@@ -234,7 +236,7 @@ Each directed test is represented using a packed test-vector structure containin
 
 For each vector, the testbench applies the inputs, allows the combinational design to settle, compares the DUT output against the expected bit pattern, and reports any mismatch with the input operands, expected output and actual output.
 
-The current directed suite contains **40 tests**, all of which pass.
+The current directed suite contains **40 tests, all of which pass**.
 
 ### Directed Test Coverage
 
@@ -254,11 +256,9 @@ The current directed suite contains **40 tests**, all of which pass.
 | 35–36 | NaN handling | Check NaN special-case output handling |
 | 37–39 | Overflow | Check results that overflow to positive or negative infinity |
 
-> **Image placeholder — RTL testbench result**
->
-> Insert a terminal/simulator screenshot showing all 40 directed tests passing.
+> **TODO:** Add a terminal / simulator screenshot showing all 40 RTL tests passing.
 
-The directed tests are deliberately grouped by datapath function so that a failure gives useful information about which part of the implementation is likely to be responsible.
+The directed tests are grouped by datapath function so that a failure gives useful information about which part of the implementation is likely to be responsible.
 
 ---
 
@@ -275,11 +275,7 @@ The intended comparison includes:
 | Combinational RTL | **TODO** | **TODO** | **TODO** | Idiomatic RTL port |
 | Functionally pipelined RTL | **TODO** | **TODO** | **TODO** | RTL pipeline |
 
-> **Image placeholder — synthesis / timing comparison**
->
-> Insert the final synthesis or timing comparison figure here.
-
-This section will be completed once the implementations have been synthesised under comparable conditions.
+> **TODO:** Add final synthesis / timing comparison figure once the implementations have been synthesised under comparable conditions.
 
 ---
 
@@ -287,7 +283,7 @@ This section will be completed once the implementations have been synthesised un
 
 Building the schematic implementation first forced me to understand the floating-point datapath at a lower level, including exponent alignment, effective subtraction, normalisation and the propagation of information required for rounding.
 
-Porting the same behaviour to SystemVerilog highlighted a different design skill: choosing the correct level of abstraction. RTL does not need to reproduce every mux, encoder or arithmetic component from a schematic. Instead, the designer can express the required behaviour clearly and allow synthesis to determine the lower-level implementation.
+Porting the same behaviour to SystemVerilog highlighted a different design skill: choosing the correct level of abstraction. RTL does not need to reproduce every mux, encoder or arithmetic component from a schematic. Instead, the required behaviour can be expressed directly and the synthesis tool can determine the lower-level implementation.
 
 The main sources of subtle implementation bugs were:
 
@@ -301,18 +297,21 @@ The main sources of subtle implementation bugs were:
 
 ## Repository Structure
 
-> **Placeholder — update paths to match the final repository**
-
 ```text
 .
 ├── README.md
-├── src/
-│   └── <SystemVerilog source files>
-├── tb/
-│   └── <self-checking testbench>
-└── docs/
-    └── schematics/
-        └── <detailed schematic screenshots>
+├── <SystemVerilog source / testbench files>
+└── schematics/
+    ├── actual_shift_calculator.png
+    ├── full_datapath_schematic.png
+    ├── lsr_extended.png
+    ├── mask_generator.png
+    ├── normalisation_extended_subnormal.png
+    ├── priority_encoder_4.png
+    ├── priority_encoder_6.png
+    ├── schematic_verification_setup.png
+    ├── system_decomposition_diagram.png
+    └── system_decomposition_diagram.svg
 ```
 
 ---
@@ -327,6 +326,7 @@ The main sources of subtle implementation bugs were:
 - [x] Subnormal handling
 - [x] Self-checking RTL testbench
 - [x] 40 directed RTL tests passing
-- [ ] Add final README images
+- [ ] Add RTL verification screenshot
+- [ ] Add pipelining / timing-analysis images
 - [ ] Complete synthesis comparison
 - [ ] Document final pipelining and timing results
