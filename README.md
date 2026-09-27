@@ -268,12 +268,12 @@ One of the aims of the project is to compare the hardware produced from the sche
 
 The intended comparison includes:
 
-| Implementation | Maximum frequency | Logic resources | Registers | Notes |
+| Implementation | Maximum frequency (MHz) | Logic resources | Notes |
 |---|---:|---:|---:|---|
-| Initial combinational schematic | **TODO** | **TODO** | **TODO** | Baseline schematic |
-| Pipelined / timing-optimised schematic | **TODO** | **TODO** | **TODO** | Timing-driven pipeline |
-| Combinational RTL | **TODO** | **TODO** | **TODO** | Idiomatic RTL port |
-| Functionally pipelined RTL | **TODO** | **TODO** | **TODO** | RTL pipeline |
+| Initial combinational schematic | 24.449 | 857 | Baseline schematic |
+| Pipelined / timing-optimised schematic | 59.880 | 769 | Timing-driven pipeline |
+| Combinational RTL | **TODO** | **TODO** | Idiomatic RTL port |
+| Functionally pipelined RTL | **TODO** | **TODO** | RTL pipeline |
 
 > **TODO:** Add final synthesis / timing comparison figure once the implementations have been synthesised under comparable conditions.
 
