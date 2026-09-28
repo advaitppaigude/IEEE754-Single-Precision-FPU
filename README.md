@@ -392,7 +392,7 @@ The intended comparison includes:
 | Initial combinational schematic | 24.449 | 857 | Baseline schematic |
 | Pipelined / timing-optimised schematic | 59.880 | 769 | Timing-driven pipeline |
 | Combinational RTL | 26.527 | 779 | Idiomatic RTL port |
-| Functionally pipelined RTL | **TODO** | **TODO** | RTL pipeline |
+| Functionally pipelined RTL | 92.507 | 951 | RTL pipeline |
 
 Note: For combinational designs, Fmax was measured by placing the datapath between input and output registers solely for timing characterization.
 
