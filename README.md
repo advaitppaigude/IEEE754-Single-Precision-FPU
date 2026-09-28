@@ -379,6 +379,144 @@ This partition is both relatively well balanced and aligned with natural functio
 
 The resulting pipelined RTL was then re-synthesised and analysed using Quartus post-fit timing. These measured results, rather than the additive block-delay model, are used for the final performance comparison.
 
+## Pipelined RTL Implementation
+
+The timing-characterisation experiment was then used to implement a four-stage pipelined version of the SystemVerilog design.
+
+The selected partition was:
+
+| Stage | Logic |
+|---|---|
+| 1 | Unpack → exponent difference → alignment shift |
+| 2 | Operand selection / conditional negation → significand arithmetic |
+| 3 | Normalisation |
+| 4 | Rounding → post-round renormalisation → packing → special-case handling |
+
+The initial partitioning model treated each stage as a contiguous group of functional blocks and estimated stage delay by summing the individually characterised block delays.
+
+For the four-stage design, the predicted stage delays were:
+
+| Stage | Predicted delay (ns) |
+|---|---:|
+| Stage 1 | 12.869 |
+| Stage 2 | 11.618 |
+| Stage 3 | 10.205 |
+| Stage 4 | 12.800 |
+
+This gave a predicted worst-stage delay of:
+
+$$
+T_{\text{predicted}} = 12.869\text{ ns}
+$$
+
+corresponding to an estimated:
+
+$$
+F_{\max} \approx \frac{1000}{12.869} = 77.7\text{ MHz}
+$$
+
+### Pipeline Register Design
+
+Implementing the pipeline required more than simply placing registers between the major arithmetic blocks.
+
+Each pipeline boundary must preserve all information required by later stages. This includes both the main datapath and **sideband information** such as operand signs, the selected exponent, and the original operands required for special-case handling.
+
+Some signals are produced in an early stage but are not consumed until several stages later. These therefore need to be propagated through multiple pipeline registers even if intermediate stages do not modify them.
+
+For example:
+
+| Signal | Produced | Consumed | Required propagation |
+|---|---|---|---|
+| Aligned significand | Stage 1 | Stage 2 | S1 → S2 |
+| Arithmetic exponent | Stage 1 | Stage 3 | S1 → S2 → S3 |
+| Arithmetic sign | Stage 2 | Stage 4 | S2 → S3 → S4 |
+| `a`, `b`, effective B sign | Input / Stage 1 | Stage 4 | propagated through all intermediate stages |
+| Normalised exponent/significand | Stage 3 | Stage 4 | S3 → S4 |
+
+This was an important practical distinction between a block-level timing partition and an actual pipeline implementation: a pipeline stage must maintain the complete transaction context, not just the most obvious arithmetic result.
+
+### Fourth Output Register
+
+Three internal register boundaries separate the four combinational stages, but an additional output register is required after Stage 4:
+
+```text
+Stage 1 → R1 → Stage 2 → R2 → Stage 3 → R3 → Stage 4 → R4
+```
+
+Without the final register, Stage 4 would terminate at a combinational output and the design would not behave as a true four-stage pipeline.
+
+Adding the fourth register gives:
+
+- four-cycle input-to-output latency;
+- one-result-per-cycle throughput once the pipeline is full;
+- a clean register-to-register timing path for the final stage;
+- consistent timing analysis across all four pipeline stages.
+
+The testbench was updated accordingly by pipelining the expected output and a validity signal through the same four-cycle delay.
+
+### Post-Fit Timing Results
+
+After implementation, the pipelined RTL was compiled in Quartus for the same MAX 10 target used for the earlier experiments.
+
+The critical path reported by Quartus was **10.810 ns**. It began at the Stage-1 `aligned_significand_s1` register, passed through `operand_negation_extended` and `significand_arithmetic`, and terminated at the Stage-2 `arithmetic_result_s2` register.
+
+This means the final implementation was limited by **Stage 2**, rather than Stage 1 as predicted by the simple additive timing model.
+
+The predicted Stage-2 delay was:
+
+$$
+T_{\text{S2,predicted}} = 11.618\text{ ns}
+$$
+
+while Quartus produced:
+
+$$
+T_{\text{S2,actual}} = 10.810\text{ ns}
+$$
+
+giving a difference of approximately:
+
+$$
+\frac{11.618 - 10.810}{11.618}\times 100
+\approx 7.0\%
+$$
+
+Thus, the isolated-block timing model predicted the eventual critical stage to within approximately **7%**.
+
+Comparing against the predicted overall worst-stage delay:
+
+$$
+\frac{12.869 - 10.810}{12.869}\times 100
+\approx 16.0\%
+$$
+
+so the implemented pipeline achieved a critical-path delay approximately **16% lower** than the conservative pre-implementation estimate.
+
+The reciprocal of the measured 10.810 ns data-path delay is approximately 92.5 MHz, compared with the model's 77.7 MHz estimate. This corresponds to approximately a **19% improvement over the predicted frequency estimate**, although the final quoted Fmax should be taken from Quartus' timing analysis rather than from the reciprocal of the raw data-path delay alone.
+
+### Interpretation
+
+The experiment showed that the initial timing model was useful for choosing pipeline boundaries, but not exact.
+
+The isolated block delays were intentionally treated as additive:
+
+$$
+T_{\text{stage}} \approx \sum_i T_i
+$$
+
+where each $T_i$ was measured independently.
+
+In the integrated design, Quartus can optimise logic across module boundaries, alter mapping and routing, and take advantage of the FPGA carry-chain structure. The resulting post-fit timing therefore differs from the simple sum of isolated measurements.
+
+Despite this, the model correctly identified the expensive region around operand selection, conditional negation, and significand arithmetic. The final critical path passed through exactly this part of the datapath, with a measured delay close to the independently predicted value.
+
+The main implementation lessons were:
+
+- pipeline design must preserve **sideband and control information**, not only the main arithmetic datapath;
+- signals may need to cross several pipeline boundaries before being consumed;
+- stage numbering should describe registered pipeline state explicitly;
+- a four-stage combinational partition requires a fourth output register to provide true four-cycle pipeline behaviour;
+- isolated timing measurements are useful for guiding architectural decisions, but final post-fit timing remains the authoritative result.
 
 
 ## Synthesis Comparison
