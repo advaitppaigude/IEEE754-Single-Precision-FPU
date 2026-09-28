@@ -60,11 +60,8 @@ The schematic design was verified using directed test cases before the SystemVer
 
 ### Pipelining Approach
 
-The schematic implementation was also used to explore timing-driven pipelining. The intention was to place pipeline boundaries based on the combinational structure and critical paths rather than simply splitting the design into an arbitrary number of equal stages.
+The schematic implementation was also used to explore timing-driven pipelining. Pipeline boundaries were chosen from the combinational structure and measured critical paths rather than by dividing the datapath into arbitrary equal stages. The resulting timing-optimised schematic is included in the synthesis comparison below.
 
-> **TODO:** Add timing-analysis / netlist images showing the chosen pipeline boundaries and critical-path improvements.
-
-The final synthesis comparison is discussed later in this README.
 
 ---
 
@@ -256,10 +253,6 @@ The current directed suite contains **40 tests, all of which pass**.
 | 35–36 | NaN handling | Check NaN special-case output handling |
 | 37–39 | Overflow | Check results that overflow to positive or negative infinity |
 
-> **TODO:** Add a terminal / simulator screenshot showing all 40 RTL tests passing.
-
-The directed tests are grouped by datapath function so that a failure gives useful information about which part of the implementation is likely to be responsible.
-
 ---
 
 ## Pipelining and Timing Optimisation
@@ -379,41 +372,9 @@ This partition is both relatively well balanced and aligned with natural functio
 
 The resulting pipelined RTL was then re-synthesised and analysed using Quartus post-fit timing. These measured results, rather than the additive block-delay model, are used for the final performance comparison.
 
-## Pipelined RTL Implementation
+### Pipelined RTL Implementation
 
-The timing-characterisation experiment was then used to implement a four-stage pipelined version of the SystemVerilog design.
-
-The selected partition was:
-
-| Stage | Logic |
-|---|---|
-| 1 | Unpack → exponent difference → alignment shift |
-| 2 | Operand selection / conditional negation → significand arithmetic |
-| 3 | Normalisation |
-| 4 | Rounding → post-round renormalisation → packing → special-case handling |
-
-The initial partitioning model treated each stage as a contiguous group of functional blocks and estimated stage delay by summing the individually characterised block delays.
-
-For the four-stage design, the predicted stage delays were:
-
-| Stage | Predicted delay (ns) |
-|---|---:|
-| Stage 1 | 12.869 |
-| Stage 2 | 11.618 |
-| Stage 3 | 10.205 |
-| Stage 4 | 12.800 |
-
-This gave a predicted worst-stage delay of:
-
-$$
-T_{\text{predicted}} = 12.869\text{ ns}
-$$
-
-corresponding to an estimated:
-
-$$
-F_{\max} \approx \frac{1000}{12.869} = 77.7\text{ MHz}
-$$
+The four-stage partition selected above was then implemented directly in the SystemVerilog datapath. The main implementation challenge was not the placement of the arithmetic registers themselves, but preserving all transaction state required by downstream stages.
 
 ### Pipeline Register Design
 
@@ -445,14 +406,7 @@ Stage 1 → R1 → Stage 2 → R2 → Stage 3 → R3 → Stage 4 → R4
 
 Without the final register, Stage 4 would terminate at a combinational output and the design would not behave as a true four-stage pipeline.
 
-Adding the fourth register gives:
-
-- four-cycle input-to-output latency;
-- one-result-per-cycle throughput once the pipeline is full;
-- a clean register-to-register timing path for the final stage;
-- consistent timing analysis across all four pipeline stages.
-
-The testbench was updated accordingly by pipelining the expected output and a validity signal through the same four-cycle delay.
+The fourth register gives four-cycle input-to-output latency, one-result-per-cycle throughput once the pipeline is full, and a register-to-register timing endpoint for Stage 4. The testbench was updated by delaying the expected result and a validity signal through the same four-cycle pipeline.
 
 ### Post-Fit Timing Results
 
@@ -492,38 +446,35 @@ $$
 
 so the implemented pipeline achieved a critical-path delay approximately **16% lower** than the conservative pre-implementation estimate.
 
-The reciprocal of the measured 10.810 ns data-path delay is approximately 92.5 MHz, compared with the model's 77.7 MHz estimate. This corresponds to approximately a **19% improvement over the predicted frequency estimate**, although the final quoted Fmax should be taken from Quartus' timing analysis rather than from the reciprocal of the raw data-path delay alone.
+For consistency with the other implementations, the characterised Fmax was calculated as the reciprocal of the Quartus-reported critical-path data delay:
+
+$$
+F_{\max} = \frac{1000}{10.810} = 92.507\text{ MHz}
+$$
+
+This is approximately **19% higher** than the 77.7 MHz estimate from the additive timing model.
 
 ### Interpretation
 
-The experiment showed that the initial timing model was useful for choosing pipeline boundaries, but not exact.
-
-The isolated block delays were intentionally treated as additive:
+The additive timing model was deliberately approximate:
 
 $$
 T_{\text{stage}} \approx \sum_i T_i
 $$
 
-where each $T_i$ was measured independently.
-
-In the integrated design, Quartus can optimise logic across module boundaries, alter mapping and routing, and take advantage of the FPGA carry-chain structure. The resulting post-fit timing therefore differs from the simple sum of isolated measurements.
-
-Despite this, the model correctly identified the expensive region around operand selection, conditional negation, and significand arithmetic. The final critical path passed through exactly this part of the datapath, with a measured delay close to the independently predicted value.
+Quartus can optimise across module boundaries and change mapping and routing when the blocks are integrated, so the post-fit result is not expected to match the isolated measurements exactly. Even so, the model identified the same expensive region that became critical after implementation: operand selection / conditional negation followed by significand arithmetic.
 
 The main implementation lessons were:
 
 - pipeline design must preserve **sideband and control information**, not only the main arithmetic datapath;
 - signals may need to cross several pipeline boundaries before being consumed;
-- stage numbering should describe registered pipeline state explicitly;
 - a four-stage combinational partition requires a fourth output register to provide true four-cycle pipeline behaviour;
-- isolated timing measurements are useful for guiding architectural decisions, but final post-fit timing remains the authoritative result.
+- isolated timing measurements are useful for architectural decisions, but the integrated post-fit result is the final reference.
 
 
 ## Synthesis Comparison
 
-One of the aims of the project is to compare the hardware produced from the schematic and RTL implementations rather than assuming that a more concise RTL description necessarily produces a better result.
-
-The intended comparison includes:
+The implementations were synthesised on the same MAX 10 target to compare timing and logic usage directly:
 
 | Implementation | Characterised Fmax (MHz) | Logic resources (LEs) | Notes |
 |---|---:|---:|---|
@@ -532,9 +483,7 @@ The intended comparison includes:
 | Combinational RTL | 26.527 | 779 | Idiomatic RTL port |
 | Functionally pipelined RTL | 92.507 | 951 | RTL pipeline |
 
-Note: For combinational designs, Fmax was measured by placing the datapath between input and output registers solely for timing characterization.
-
-> **TODO:** Add final synthesis / timing comparison figure once the implementations have been synthesised under comparable conditions.
+**Timing convention:** characterised Fmax is calculated as $1000/T_{\text{crit}}$ using the Quartus-reported post-fit critical-path data delay in nanoseconds. Combinational implementations were placed between timing-only input and output registers so that their datapath delay could be characterised in the same way.
 
 ---
 
@@ -550,42 +499,7 @@ The main sources of subtle implementation bugs were:
 - preserving the correct intermediate width during arithmetic;
 - handling guard, round and sticky information correctly;
 - distinguishing stored IEEE-754 fields from the internal representation used by the datapath;
-- choosing between explicit structural logic and clearer behavioural RTL.
+- choosing between explicit structural logic and clearer behavioural RTL;
+- keeping sideband state aligned with the main datapath when introducing pipeline boundaries.
 
 ---
-
-## Repository Structure
-
-```text
-.
-├── README.md
-├── <SystemVerilog source / testbench files>
-└── schematics/
-    ├── actual_shift_calculator.png
-    ├── full_datapath_schematic.png
-    ├── lsr_extended.png
-    ├── mask_generator.png
-    ├── normalisation_extended_subnormal.png
-    ├── priority_encoder_4.png
-    ├── priority_encoder_6.png
-    ├── schematic_verification_setup.png
-    ├── system_decomposition_diagram.png
-    └── system_decomposition_diagram.svg
-```
-
----
-
-## Current Status
-
-- [x] Combinational schematic floating-point add/sub datapath
-- [x] SystemVerilog port of the combinational datapath
-- [x] Round-to-nearest, ties-to-even
-- [x] NaN and infinity handling
-- [x] Signed-zero handling
-- [x] Subnormal handling
-- [x] Self-checking RTL testbench
-- [x] 40 directed RTL tests passing
-- [ ] Add RTL verification screenshot
-- [ ] Add pipelining / timing-analysis images
-- [ ] Complete synthesis comparison
-- [ ] Document final pipelining and timing results
