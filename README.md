@@ -343,12 +343,7 @@ $$
 Therefore the proposed score becomes:
 
 $$
-S =
-\frac{F_{\max}}{L}
-=
-\frac{n/k}{k}
-=
-\frac{n}{k^2}
+S = \frac{F_{\max}}{L} = \frac{n/k}{k} = \frac{n}{k^2}
 $$
 
 For an ideal pipeline, this increases linearly with the number of stages. It would therefore always favour adding more stages and does not produce a meaningful optimum.
