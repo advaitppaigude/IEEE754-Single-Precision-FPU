@@ -80,7 +80,10 @@ Instead, I used the port to identify structures that could be expressed at a mor
 
 This allowed the RTL to describe the intended hardware behaviour more directly and leave lower-level implementation choices to synthesis.
 
-### Example 1 — Leading-One Detection
+### Example 1 — Normalisation Path
+
+
+#### 1A — Leading-One Detection
 
 The schematic normalisation logic used an explicit priority-encoder hierarchy to identify the position of the first `1` in the significand.
 
@@ -132,6 +135,39 @@ endmodule
 ```
 
 The RTL describes the required priority behaviour directly rather than reproducing the exact hierarchy of schematic encoder components.
+
+
+#### 1B — Bounded Normalisation
+
+The schematic normalisation stage combined leading-one detection with logic that limited the left shift so that the exponent could not be decremented below the subnormal boundary.
+
+<p align="center">
+  <img src="schematics/normalisation_extended_subnormal.png" alt="Normalisation and subnormal handling schematic" width="950">
+</p>
+
+The shift amount was bounded separately using the current exponent:
+
+<p align="center">
+  <img src="schematics/actual_shift_calculator.png" alt="Actual normalisation shift calculator schematic" width="700">
+</p>
+
+In the RTL port, these behaviours are represented directly using a leading-one position, a calculated maximum legal shift, and combinational selection logic rather than reproducing the original schematic hierarchy exactly.
+
+### Other RTL Transformations
+
+Other parts of the port followed the same approach:
+
+| Function | Schematic-style implementation | RTL representation |
+|---|---|---|
+| Exponent / magnitude comparison | Explicit arithmetic and selection logic | Direct comparison and subtraction |
+| Effective subtraction | Adder/XOR-style arithmetic structure | Arithmetic expressed directly in RTL where appropriate |
+| Selection networks | Explicit mux blocks | `if`, ternary expressions and `case` statements |
+| Leading-one detection | Priority-encoder hierarchy | Priority `if`/`else if` chain |
+| Sticky-bit generation | Separate mask-generation structure | Mask expression plus reduction OR |
+| Post-round carry | Explicit arithmetic / mux handling | Widened addition followed by renormalisation |
+
+These changes are intended to express the required behaviour more clearly at RTL level. Any claims about differences in area or timing are left to the synthesis results rather than inferred from source-code appearance alone.
+
 
 ### Example 2 — Alignment and Sticky-Bit Generation
 
@@ -187,36 +223,7 @@ endmodule
 
 The reduction-OR of the masked discarded bits generates the sticky bit while the shifted result retains the bits required for subsequent guard/round handling.
 
-### Example 3 — Normalisation
 
-The schematic normalisation stage combined leading-one detection with logic that limited the left shift so that the exponent could not be decremented below the subnormal boundary.
-
-<p align="center">
-  <img src="schematics/normalisation_extended_subnormal.png" alt="Normalisation and subnormal handling schematic" width="950">
-</p>
-
-The shift amount was bounded separately using the current exponent:
-
-<p align="center">
-  <img src="schematics/actual_shift_calculator.png" alt="Actual normalisation shift calculator schematic" width="700">
-</p>
-
-In the RTL port, these behaviours are represented directly using a leading-one position, a calculated maximum legal shift, and combinational selection logic rather than reproducing the original schematic hierarchy exactly.
-
-### Other RTL Transformations
-
-Other parts of the port followed the same approach:
-
-| Function | Schematic-style implementation | RTL representation |
-|---|---|---|
-| Exponent / magnitude comparison | Explicit arithmetic and selection logic | Direct comparison and subtraction |
-| Effective subtraction | Adder/XOR-style arithmetic structure | Arithmetic expressed directly in RTL where appropriate |
-| Selection networks | Explicit mux blocks | `if`, ternary expressions and `case` statements |
-| Leading-one detection | Priority-encoder hierarchy | Priority `if`/`else if` chain |
-| Sticky-bit generation | Separate mask-generation structure | Mask expression plus reduction OR |
-| Post-round carry | Explicit arithmetic / mux handling | Widened addition followed by renormalisation |
-
-These changes are intended to express the required behaviour more clearly at RTL level. Any claims about differences in area or timing are left to the synthesis results rather than inferred from source-code appearance alone.
 
 ---
 
