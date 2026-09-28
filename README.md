@@ -153,22 +153,6 @@ The shift amount was bounded separately using the current exponent:
 
 In the RTL port, these behaviours are represented directly using a leading-one position, a calculated maximum legal shift, and combinational selection logic rather than reproducing the original schematic hierarchy exactly.
 
-### Other RTL Transformations
-
-Other parts of the port followed the same approach:
-
-| Function | Schematic-style implementation | RTL representation |
-|---|---|---|
-| Exponent / magnitude comparison | Explicit arithmetic and selection logic | Direct comparison and subtraction |
-| Effective subtraction | Adder/XOR-style arithmetic structure | Arithmetic expressed directly in RTL where appropriate |
-| Selection networks | Explicit mux blocks | `if`, ternary expressions and `case` statements |
-| Leading-one detection | Priority-encoder hierarchy | Priority `if`/`else if` chain |
-| Sticky-bit generation | Separate mask-generation structure | Mask expression plus reduction OR |
-| Post-round carry | Explicit arithmetic / mux handling | Widened addition followed by renormalisation |
-
-These changes are intended to express the required behaviour more clearly at RTL level. Any claims about differences in area or timing are left to the synthesis results rather than inferred from source-code appearance alone.
-
-
 ### Example 2 — Alignment and Sticky-Bit Generation
 
 Floating-point addition requires the smaller significand to be right-shifted until the operand exponents are aligned. Bits discarded during this shift cannot simply be ignored because they contribute to the sticky bit used during rounding.
@@ -223,7 +207,20 @@ endmodule
 
 The reduction-OR of the masked discarded bits generates the sticky bit while the shifted result retains the bits required for subsequent guard/round handling.
 
+### Other RTL Transformations
 
+Other parts of the port followed the same approach:
+
+| Function | Schematic-style implementation | RTL representation |
+|---|---|---|
+| Exponent / magnitude comparison | Explicit arithmetic and selection logic | Direct comparison and subtraction |
+| Effective subtraction | Adder/XOR-style arithmetic structure | Arithmetic expressed directly in RTL where appropriate |
+| Selection networks | Explicit mux blocks | `if`, ternary expressions and `case` statements |
+| Leading-one detection | Priority-encoder hierarchy | Priority `if`/`else if` chain |
+| Sticky-bit generation | Separate mask-generation structure | Mask expression plus reduction OR |
+| Post-round carry | Explicit arithmetic / mux handling | Widened addition followed by renormalisation |
+
+These changes are intended to express the required behaviour more clearly at RTL level. Any claims about differences in area or timing are left to the synthesis results rather than inferred from source-code appearance alone.
 
 ---
 
