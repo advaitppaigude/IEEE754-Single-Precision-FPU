@@ -295,15 +295,15 @@ For a datapath containing \(m\) ordered functional blocks and a pipeline contain
 
 The objective is to minimise the estimated delay of the slowest stage:
 
-\[
+$$
 T_{\text{crit}} = \max(T_1,T_2,\ldots,T_n)
-\]
+$$
 
 and hence maximise the estimated operating frequency:
 
-\[
+$$
 F_{\max} \approx \frac{1}{T_{\text{crit}}}
-\]
+$$
 
 Since there were only nine possible cut locations, exhaustive search was sufficiently small and avoided the need for a more complicated optimisation algorithm.
 
@@ -311,49 +311,49 @@ Since there were only nine possible cut locations, exhaustive search was suffici
 
 I initially considered selecting the pipeline depth using a single heuristic score:
 
-\[
+$$
 S = \frac{F_{\max}}{L}
-\]
+$$
 
-where \(L\) is the total pipeline latency.
+where $L$ is the total pipeline latency.
 
 This appeared to capture the trade-off that deeper pipelines can increase throughput while also increasing the number of cycles required for one operation. However, considering an ideal pipeline shows why this is not a suitable general optimisation criterion.
 
-Assume an unpipelined combinational path has delay \(k\), and that it can be divided perfectly across \(n\) pipeline stages. The delay of each stage would then be:
+Assume an unpipelined combinational path has delay $k$, and that it can be divided perfectly across $n$ pipeline stages. The delay of each stage would then be:
 
-\[
+$$
 T_{\text{stage}} = \frac{k}{n}
-\]
+$$
 
 giving:
 
-\[
+$$
 F_{\max} = \frac{1}{T_{\text{stage}}}
           = \frac{n}{k}
-\]
+$$
 
-The total latency of an \(n\)-stage pipeline would be:
+The total latency of an $n$-stage pipeline would be:
 
-\[
+$$
 L = nT_{\text{stage}}
   = n\frac{k}{n}
   = k
-\]
+$$
 
 Therefore the proposed score becomes:
 
-\[
+$$
 S =
 \frac{F_{\max}}{L}
 =
 \frac{n/k}{k}
 =
 \frac{n}{k^2}
-\]
+$$
 
 For an ideal pipeline, this increases linearly with the number of stages. It would therefore always favour adding more stages and does not produce a meaningful optimum.
 
-A finite optimum only appeared with the measured data because the real system is non-ideal. Functional blocks cannot always be divided further, pipeline stages are not perfectly balanced, and additional registers introduce setup, clock-to-Q and routing overheads. These non-idealities eventually cause the improvement in \(F_{\max}\) to flatten while latency and register count continue to increase.
+A finite optimum only appeared with the measured data because the real system is non-ideal. Functional blocks cannot always be divided further, pipeline stages are not perfectly balanced, and additional registers introduce setup, clock-to-Q and routing overheads. These non-idealities eventually cause the improvement in $F_{\max}$ to flatten while latency and register count continue to increase.
 
 I therefore used **diminishing returns in predicted Fmax**, rather than the throughput/latency score, as the main criterion for selecting the initial pipeline depth.
 
